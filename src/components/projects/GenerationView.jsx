@@ -1,16 +1,16 @@
 "use client";
 
 import { PanelLeftOpen } from "lucide-react";
+import { useProjectChat } from "@/components/projects/ChatProvider";
 import { GenerationSidebar } from "@/components/projects/GenerationSidebar";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { useProjectChat } from "@/components/projects/ChatProvider";
 
 export function GenerationView() {
   useProjectChat();
 
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col gap-4 lg:grid lg:grid-cols-[360px_1fr]">
+    <div className="flex h-full min-h-0 flex-1 flex-col gap-4 lg:grid lg:grid-cols-[420px_1fr]">
       <GenerationSidebar className="hidden lg:block" />
       <div className="flex h-full min-h-0 flex-col">
         <div className="mb-4 lg:hidden">
