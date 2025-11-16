@@ -4,6 +4,7 @@ import { useId, useState } from "react";
 import { Response } from "@/components/ai-elements/response";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { ALLOWED_RESOLUTIONS, DEFAULT_RESOLUTION } from "@/app/api/chat/videoSchema";
 import {
   DEFAULT_VIDEO_STATUS_MESSAGE,
   VIDEO_TOOL_STATUS_MESSAGES,
@@ -11,9 +12,7 @@ import {
   deriveVideoPlan,
   deriveVideoToolState,
   extractTextContent,
-  findLatestVideoPlan,
 } from "./videoToolUtils";
-import { GenerationVideoPlanCard } from "./GenerationVideoPlanCard";
 import { useProjectChat } from "./ChatProvider";
 
 const REQUIRED_TOOL_FIELDS = ["audioUrl", "imageUrl"];
@@ -32,17 +31,60 @@ function buildTextBubble(messageId, content, isUser) {
 }
 
 function buildVideoPlanBubble(messageId, plan) {
+  const pretty = JSON.stringify(plan, null, 2);
+
   return (
     <div className="flex justify-start" key={`${messageId}-video-plan`}>
-      <div className="max-w-[85%]">
-        <GenerationVideoPlanCard plan={plan} />
+      <div
+        className={cn(
+          "bg-muted",
+          "max-w-[85%]",
+          "px-3",
+          "py-2",
+          "rounded-lg",
+          "shadow-sm",
+          "text-foreground",
+          "text-sm",
+        )}
+      >
+        <p
+          className={cn(
+            "font-semibold",
+            "text-muted-foreground",
+            "text-xs",
+            "tracking-wide",
+            "uppercase",
+          )}
+        >
+          Video request object
+        </p>
+        <pre
+          className={cn(
+            "break-words",
+            "font-mono",
+            "leading-5",
+            "mt-2",
+            "text-foreground",
+            "text-xs",
+            "whitespace-pre-wrap",
+          )}
+        >
+          {pretty}
+        </pre>
       </div>
     </div>
   );
 }
 
+function isFormSubmissionMessage(content) {
+  return typeof content === "string" && content.startsWith("FORM_SUBMISSION::");
+}
+
 function resolveAssistantContent({ content, isUser, toolState }) {
   if (isUser) {
+    if (isFormSubmissionMessage(content)) {
+      return "";
+    }
     return content;
   }
 
@@ -82,7 +124,6 @@ export function GenerationMessageList({ messages }) {
       maybePromptForMissingFields({
         bubbles,
         message,
-        messages,
         videoPlan,
       });
     }
@@ -91,24 +132,21 @@ export function GenerationMessageList({ messages }) {
   });
 }
 
-function maybePromptForMissingFields({ videoPlan, messages, message, bubbles }) {
-  const missing = Array.isArray(videoPlan?.missingFields) ? videoPlan.missingFields : [];
-  const hasMissingRequired = REQUIRED_TOOL_FIELDS.some(
+function maybePromptForMissingFields({ videoPlan, message, bubbles }) {
+  const planMissingFields = Array.isArray(videoPlan?.missingFields)
+    ? videoPlan.missingFields
+    : [];
+  const derivedMissingFields = REQUIRED_TOOL_FIELDS.filter(
     (field) => videoPlan?.[field] == null || videoPlan?.[field] === "",
   );
+  const missing = Array.from(new Set([...planMissingFields, ...derivedMissingFields]));
+  const hasMissingRequired = missing.length > 0;
 
-  if (!hasMissingRequired || missing.length === 0) {
+  if (!hasMissingRequired) {
     return;
   }
 
   const missingList = missing.join(" and ");
-  const latestPlan = findLatestVideoPlan(messages);
-  const alreadyPrompted = latestPlan?.messageId === message.id;
-
-  if (alreadyPrompted) {
-    return;
-  }
-
   bubbles.push(
     buildTextBubble(
       `${message.id}-missing-input`,
@@ -116,56 +154,114 @@ function maybePromptForMissingFields({ videoPlan, messages, message, bubbles }) 
       false,
     ),
   );
-  bubbles.push(buildMissingFieldFormBubble(message.id, missing));
+  bubbles.push(buildMissingFieldFormBubble({ messageId: message.id, missingFields: missing, plan: videoPlan }));
 }
 
-function buildMissingFieldFormBubble(messageId, missingFields) {
+function buildMissingFieldFormBubble({ messageId, missingFields, plan }) {
   return (
     <div className="flex justify-start" key={`${messageId}-missing-input-form`}>
       <div className="max-w-[85%]">
-        <MissingFieldInlineForm fields={missingFields} />
+        <MissingFieldInlineForm fields={missingFields} plan={plan} />
       </div>
     </div>
   );
 }
-
-const FIELD_LABELS = {
-  audioUrl: "Audio URL",
-  imageUrl: "Image URL",
-};
 
 const FIELD_PLACEHOLDERS = {
   audioUrl: "https://example.com/voiceover.mp3",
   imageUrl: "https://example.com/thumbnail.jpg",
 };
 
-function MissingFieldInlineForm({ fields }) {
+const RESOLUTION_OPTIONS = ALLOWED_RESOLUTIONS;
+const TEXT_INPUT_CLASSES = [
+  "bg-background",
+  "border",
+  "border-input",
+  "focus-visible:outline-none",
+  "focus-visible:ring-2",
+  "focus-visible:ring-primary",
+  "px-3",
+  "py-2",
+  "rounded-md",
+  "shadow-sm",
+  "text-foreground",
+  "text-sm",
+  "w-full",
+];
+
+function MissingFieldInlineForm({ fields, plan }) {
   const { sendMessage, status } = useProjectChat();
   const baseId = useId();
-  const [values, setValues] = useState(() =>
-    Object.fromEntries(fields.map((field) => [field, ""])),
-  );
-  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [formState, setFormState] = useState(() => ({
+    title: plan?.title ?? "",
+    description: plan?.description ?? "",
+    resolution: RESOLUTION_OPTIONS.includes(plan?.resolution)
+      ? plan.resolution
+      : DEFAULT_RESOLUTION,
+    audioUrl: plan?.audioUrl ?? "",
+    imageUrl: plan?.imageUrl ?? "",
+  }));
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isStreaming = status === "streaming";
-  const allFilled = fields.every((field) => values[field]?.trim());
+  const requiresAudio = fields.includes("audioUrl");
+  const requiresImage = fields.includes("imageUrl");
+
+  const requiredFields = [];
+  if (requiresAudio) {
+    requiredFields.push("audioUrl");
+  }
+  if (requiresImage) {
+    requiredFields.push("imageUrl");
+  }
+
+  const isMissingRequired = requiredFields.some((field) => {
+    const value = formState[field];
+    if (typeof value !== "string") {
+      return true;
+    }
+    return value.trim() === "";
+  });
+  const canSubmit = !(isStreaming || isSubmitting || isMissingRequired);
 
   const handleChange = (field) => (event) => {
-    setValues((previous) => ({ ...previous, [field]: event.target.value }));
+    const { value } = event.target;
+    setFormState((previous) => ({ ...previous, [field]: value }));
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
-    if (!allFilled || isStreaming) {
+    if (!canSubmit) {
       return;
     }
 
-    const payload = fields
-      .map((field) => `${field}: ${values[field].trim()}`)
-      .join("\n");
+    setIsSubmitting(true);
+    const payloadObject = {
+      type: "video-request",
+      title: formState.title.trim(),
+      description: formState.description.trim(),
+      resolution: formState.resolution,
+      audioUrl: formState.audioUrl.trim(),
+      imageUrl: formState.imageUrl.trim(),
+    };
 
-    sendMessage({ parts: [{ type: "text", text: payload }] });
-    setIsSubmitted(true);
+    const message = [
+      "FORM_SUBMISSION::missing-field-inline-form",
+      "Please call the generateVideoPlan tool with the following payload to update the video request:",
+      JSON.stringify(payloadObject, null, 2),
+    ].join("\n");
+
+    try {
+      await sendMessage({
+        parts: [{ type: "text", text: message }],
+      });
+    } catch (error) {
+      requestAnimationFrame(() => {
+        throw error;
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -184,10 +280,10 @@ function MissingFieldInlineForm({ fields }) {
       onSubmit={handleSubmit}
     >
       <p className="font-medium text-primary text-xs">
-        Drop the missing links below and I'll slot them into the plan.
+        Fill in the details below and I’ll craft the video plan for you.
       </p>
-      {fields.map((field) => (
-        <div className="space-y-1" key={field}>
+      <div className="space-y-2">
+        <div className="space-y-1">
           <label
             className={cn(
               "block",
@@ -197,42 +293,154 @@ function MissingFieldInlineForm({ fields }) {
               "tracking-wide",
               "uppercase",
             )}
-            htmlFor={`${baseId}-${field}`}
+            htmlFor={`${baseId}-title`}
           >
-            {FIELD_LABELS[field] ?? field}
+            Title (optional)
           </label>
           <input
-            className={cn(
-              "bg-background",
-              "border",
-              "border-input",
-              "px-3",
-              "py-2",
-              "rounded-md",
-              "shadow-sm",
-              "text-foreground",
-              "text-sm",
-              "w-full",
-              "focus-visible:outline-none",
-              "focus-visible:ring-2",
-              "focus-visible:ring-primary",
-            )}
-            onChange={handleChange(field)}
-            placeholder={FIELD_PLACEHOLDERS[field] ?? "https://"}
-            id={`${baseId}-${field}`}
-            type="url"
-            value={values[field]}
+            className={cn(...TEXT_INPUT_CLASSES)}
+            id={`${baseId}-title`}
+            onChange={handleChange("title")}
+            placeholder="Give the video a short name"
+            type="text"
+            value={formState.title}
           />
         </div>
-      ))}
+        <div className="space-y-1">
+          <label
+            className={cn(
+              "block",
+              "font-semibold",
+              "text-muted-foreground",
+              "text-xs",
+              "tracking-wide",
+              "uppercase",
+            )}
+            htmlFor={`${baseId}-description`}
+          >
+            Description (optional)
+          </label>
+          <textarea
+            className={cn(...TEXT_INPUT_CLASSES, "min-h-[96px]")}
+            id={`${baseId}-description`}
+            onChange={handleChange("description")}
+            placeholder="Describe what should happen in the video"
+            value={formState.description}
+          />
+        </div>
+        <div className="space-y-1">
+          <span
+            className={cn(
+              "block",
+              "font-semibold",
+              "text-muted-foreground",
+              "text-xs",
+              "tracking-wide",
+              "uppercase",
+            )}
+          >
+            Resolution (optional)
+          </span>
+          <div className="flex gap-2">
+            {RESOLUTION_OPTIONS.map((option) => {
+              const isActive = formState.resolution === option;
+              return (
+                <label
+                  className={cn(
+                    "flex",
+                    "flex-1",
+                    "cursor-pointer",
+                    "items-center",
+                    "justify-center",
+                    "rounded-md",
+                    "border",
+                    "px-3",
+                    "py-2",
+                    "text-sm",
+                    "font-medium",
+                    "transition",
+                    isActive
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-muted-foreground/40 text-muted-foreground hover:border-primary/60 hover:text-primary",
+                  )}
+                  htmlFor={`${baseId}-resolution-${option}`}
+                  key={option}
+                >
+                  <input
+                    checked={isActive}
+                    className="sr-only"
+                    id={`${baseId}-resolution-${option}`}
+                    name={`${baseId}-resolution`}
+                    onChange={() =>
+                      setFormState((previous) => ({
+                        ...previous,
+                        resolution: option,
+                      }))
+                    }
+                    type="radio"
+                    value={option}
+                  />
+                  {option}p
+                </label>
+              );
+            })}
+          </div>
+        </div>
+        <div className="space-y-1">
+          <label
+            className={cn(
+              "block",
+              "font-semibold",
+              "text-muted-foreground",
+              "text-xs",
+              "tracking-wide",
+              "uppercase",
+            )}
+            htmlFor={`${baseId}-audioUrl`}
+          >
+            Audio URL{requiresAudio ? <span className="text-destructive">*</span> : null}
+          </label>
+          <input
+            className={cn(...TEXT_INPUT_CLASSES)}
+            id={`${baseId}-audioUrl`}
+            onChange={handleChange("audioUrl")}
+            placeholder={FIELD_PLACEHOLDERS.audioUrl}
+            type="url"
+            value={formState.audioUrl}
+          />
+        </div>
+        <div className="space-y-1">
+          <label
+            className={cn(
+              "block",
+              "font-semibold",
+              "text-muted-foreground",
+              "text-xs",
+              "tracking-wide",
+              "uppercase",
+            )}
+            htmlFor={`${baseId}-imageUrl`}
+          >
+            Image URL{requiresImage ? <span className="text-destructive">*</span> : null}
+          </label>
+          <input
+            className={cn(...TEXT_INPUT_CLASSES)}
+            id={`${baseId}-imageUrl`}
+            onChange={handleChange("imageUrl")}
+            placeholder={FIELD_PLACEHOLDERS.imageUrl}
+            type="url"
+            value={formState.imageUrl}
+          />
+        </div>
+      </div>
       <Button
         className="w-full"
-        disabled={isStreaming || !allFilled || isSubmitted}
+        disabled={!canSubmit}
         size="sm"
         type="submit"
         variant="default"
       >
-        {isSubmitted ? "Submitted" : "Share URLs"}
+        {isSubmitting ? "Sent" : "Send"}
       </Button>
     </form>
   );

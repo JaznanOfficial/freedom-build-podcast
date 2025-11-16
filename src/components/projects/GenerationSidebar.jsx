@@ -1,19 +1,16 @@
 "use client";
 
-import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport } from "ai";
 import { Mic, Send } from "lucide-react";
 import { useState } from "react";
 import { StickToBottom } from "use-stick-to-bottom";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useProjectChat } from "./ChatProvider";
 import { GenerationMessageList } from "./GenerationMessageList";
 
 export function GenerationSidebar({ className }) {
   const [input, setInput] = useState("");
-  const { messages, sendMessage, status } = useChat({
-    transport: new DefaultChatTransport({ api: "/api/chat" }),
-  });
+  const { messages, sendMessage, status } = useProjectChat();
 
   const isStreaming = status === "streaming";
 
