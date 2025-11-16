@@ -1,11 +1,18 @@
 "use client";
 
 import { Response } from "@/components/ai-elements/response";
-import { GenerationSceneList } from "./GenerationSceneList";
+import { GENERATE_VIDEO_TOOL_NAME } from "@/constants/aiTools";
+import { GenerationVideoPlanCard } from "./GenerationVideoPlanCard";
 
-const GENERATE_SCENES_TOOL_NAME = "generateScenes";
-const SCENE_TOOL_PART_TYPE = `tool-${GENERATE_SCENES_TOOL_NAME}`;
-const DEFAULT_SCENE_STATUS_MESSAGE = "Jaznan is generating your videos. Hold tight and enjoy...";
+const VIDEO_TOOL_PART_TYPE = `tool-${GENERATE_VIDEO_TOOL_NAME}`;
+const VIDEO_TOOL_STATUS_MESSAGES = {
+  "input-streaming": "Jaznan is cooking structured data...",
+  "input-available": "Jaznan is reviewing the ingredients...",
+  "output-streaming": "Jaznan is finishing the video brief...",
+  "output-pending": "Jaznan is finishing the video brief...",
+  "output-error": "Jaznan hit a snag while preparing the video brief.",
+};
+const DEFAULT_VIDEO_STATUS_MESSAGE = "Jaznan is cooking structured data...";
 
 function extractTextContent(message) {
   if (Array.isArray(message.parts)) {
@@ -22,91 +29,115 @@ function extractTextContent(message) {
   return "";
 }
 
-function isSceneArray(value) {
-  if (!Array.isArray(value) || value.length === 0) {
-    return false;
+function visitParts(node, callback) {
+  if (!node) {
+    return;
   }
 
-  return value.every((item) => item && typeof item === "object" && "scene_serial" in item && "prompt" in item);
+  if (Array.isArray(node)) {
+    for (const child of node) {
+      visitParts(child, callback);
+    }
+    return;
+  }
+
+  if (typeof node === "object") {
+    callback(node);
+
+    if (Array.isArray(node.parts)) {
+      visitParts(node.parts, callback);
+    }
+  }
 }
 
-function tryParseJSON(text) {
-  const trimmed = text.trim();
-  const firstChar = trimmed[0];
-  if (firstChar !== "{" && firstChar !== "[") {
+function collectVideoToolParts(message) {
+  const parts = [];
+
+  visitParts(message?.parts, (part) => {
+    if (!part?.type) {
+      return;
+    }
+
+    if (
+      part.type === VIDEO_TOOL_PART_TYPE ||
+      (part.type === "dynamic-tool" && part.toolName === GENERATE_VIDEO_TOOL_NAME)
+    ) {
+      parts.push(part);
+    }
+  });
+
+  visitParts(message?.content, (part) => {
+    if (!part?.type) {
+      return;
+    }
+
+    if (
+      part.type === VIDEO_TOOL_PART_TYPE ||
+      (part.type === "dynamic-tool" && part.toolName === GENERATE_VIDEO_TOOL_NAME)
+    ) {
+      parts.push(part);
+    }
+  });
+
+  if (Array.isArray(message?.toolInvocations)) {
+    for (const invocation of message.toolInvocations) {
+      if (invocation?.toolName === GENERATE_VIDEO_TOOL_NAME) {
+        parts.push(invocation);
+      }
+    }
+  }
+
+  return parts;
+}
+
+function deriveVideoToolState(parts) {
+  if (!Array.isArray(parts) || parts.length === 0) {
     return null;
   }
 
-  try {
-    return JSON.parse(trimmed);
-  } catch {
-    return null;
+  const prioritizedStates = [
+    "output-error",
+    "output-streaming",
+    "output-pending",
+    "input-streaming",
+    "input-available",
+  ];
+
+  for (const state of prioritizedStates) {
+    const match = parts.find((part) => part?.state === state);
+    if (match) {
+      return match.state;
+    }
   }
+
+  const completed = parts.find((part) => part?.state === "output-available" || part?.state === "result");
+  return completed?.state ?? null;
 }
 
-function scanObjectValues(objectValue, seen) {
-  for (const key of Object.keys(objectValue)) {
-    const scenes = findScenesDeep(objectValue[key], seen);
-    if (scenes) {
-      return scenes;
+function deriveVideoPlan(parts) {
+  if (!Array.isArray(parts)) {
+    return null;
+  }
+
+  const candidates = parts.filter((part) =>
+    ["output-available", "result"].includes(part?.state ?? ""),
+  );
+
+  for (const candidate of candidates) {
+    if (candidate?.output && typeof candidate.output === "object") {
+      return candidate.output;
+    }
+
+    if (candidate?.result && typeof candidate.result === "object") {
+      return candidate.result;
+    }
+
+    if (candidate?.data && typeof candidate.data === "object") {
+      return candidate.data;
     }
   }
 
   return null;
-}
-
-function findScenesDeep(value, seen = new Set()) {
-  if (value == null) {
-    return null;
-  }
-
-  if (typeof value === "string") {
-    const parsed = tryParseJSON(value);
-    return parsed ? findScenesDeep(parsed, seen) : null;
-  }
-
-  if (typeof value !== "object") {
-    return null;
-  }
-
-  if (seen.has(value)) {
-    return null;
-  }
-  seen.add(value);
-
-  if (isSceneArray(value)) {
-    return value;
-  }
-
-  if (Array.isArray(value)) {
-    for (const item of value) {
-      const scenes = findScenesDeep(item, seen);
-      if (scenes) {
-        return scenes;
-      }
-    }
-    return null;
-  }
-
-  if (Array.isArray(value.scenes)) {
-    return value.scenes;
-  }
-
-  return scanObjectValues(value, seen);
-}
-
-function extractScenes(message) {
-  return findScenesDeep(message);
-}
-
-function buildSceneBubble(messageId, scenes) {
-  return (
-    <div className="flex justify-start" key={`${messageId}-scenes`}>
-      <div className="max-w-[85%] whitespace-pre-wrap rounded-lg bg-muted px-3 py-2 text-foreground text-sm">
-        <GenerationSceneList scenes={scenes} />
-      </div>
-    </div>
-  );
 }
 
 function buildTextBubble(messageId, content, isUser) {
@@ -122,61 +153,27 @@ function buildTextBubble(messageId, content, isUser) {
   );
 }
 
-function partsIncludeSceneTool(parts) {
-  if (!Array.isArray(parts)) {
-    return false;
-  }
-
-  for (const part of parts) {
-    if (!part) {
-      continue;
-    }
-
-    if (
-      part.type === SCENE_TOOL_PART_TYPE ||
-      ((part.type === "tool-call" || part.type === "tool-result" || part.type === "tool-error") &&
-        part.toolName === GENERATE_SCENES_TOOL_NAME)
-    ) {
-      return true;
-    }
-
-    if (Array.isArray(part.parts) && partsIncludeSceneTool(part.parts)) {
-      return true;
-    }
-  }
-
-  return false;
+function buildVideoPlanBubble(messageId, plan) {
+  return (
+    <div className="flex justify-start" key={`${messageId}-video-plan`}>
+      <div className="max-w-[85%]">
+        <GenerationVideoPlanCard plan={plan} />
+      </div>
+    </div>
+  );
 }
 
-function hasSceneToolActivity(message) {
-  if (!message || message.role !== "assistant") {
-    return false;
-  }
-
-  if (partsIncludeSceneTool(message.parts)) {
-    return true;
-  }
-
-  if (partsIncludeSceneTool(message.content)) {
-    return true;
-  }
-
-  if (Array.isArray(message.toolInvocations)) {
-    return message.toolInvocations.some(
-      (invocation) => invocation?.toolName === GENERATE_SCENES_TOOL_NAME,
-    );
-  }
-
-  return false;
-}
-
-function resolveAssistantContent({ isUser, content, scenes, sceneToolActive }) {
-  if (isUser || content) {
+function resolveAssistantContent({ content, isUser, toolState }) {
+  if (isUser) {
     return content;
   }
 
-  if (sceneToolActive || Boolean(scenes?.length)) {
-    return DEFAULT_SCENE_STATUS_MESSAGE;
+  if (content) {
+    return content;
+  }
+
+  if (toolState) {
+    return VIDEO_TOOL_STATUS_MESSAGES[toolState] ?? DEFAULT_VIDEO_STATUS_MESSAGE;
   }
 
   return content;
@@ -192,17 +189,18 @@ export function GenerationMessageList({ messages }) {
     const bubbles = [];
 
     let content = extractTextContent(message);
-    const scenes = isUser ? null : extractScenes(message);
-    const sceneToolActive = isUser ? false : hasSceneToolActivity(message);
+    const videoToolParts = isUser ? [] : collectVideoToolParts(message);
+    const videoPlan = isUser ? null : deriveVideoPlan(videoToolParts);
+    const toolState = isUser ? null : deriveVideoToolState(videoToolParts);
 
-    content = resolveAssistantContent({ isUser, content, scenes, sceneToolActive });
+    content = resolveAssistantContent({ content, isUser, toolState });
 
     if (content) {
       bubbles.push(buildTextBubble(message.id, content, isUser));
     }
 
-    if (!isUser && scenes) {
-      bubbles.push(buildSceneBubble(message.id, scenes));
+    if (!isUser && videoPlan) {
+      bubbles.push(buildVideoPlanBubble(message.id, videoPlan));
     }
 
     return bubbles;
