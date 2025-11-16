@@ -118,7 +118,15 @@ function resolveAssistantContent({ content, isUser, toolState }) {
   }
 
   if (toolState) {
-    return VIDEO_TOOL_STATUS_MESSAGES[toolState] ?? DEFAULT_VIDEO_STATUS_MESSAGE;
+    if (toolState in VIDEO_TOOL_STATUS_MESSAGES) {
+      return VIDEO_TOOL_STATUS_MESSAGES[toolState];
+    }
+
+    if (toolState === "output-available" || toolState === "result") {
+      return "";
+    }
+
+    return DEFAULT_VIDEO_STATUS_MESSAGE;
   }
 
   return content;
@@ -134,17 +142,8 @@ export function GenerationMessageList({ messages }) {
     const bubbles = [];
 
     const rawContent = extractTextContent(message);
-    const parsedFormSubmission = isUser ? parseFormSubmissionMessage(rawContent) : null;
 
-    if (parsedFormSubmission) {
-      bubbles.push(
-        buildTextBubble(
-          `${message.id}-form-confirmation`,
-          "Perfect! Here's the updated video request.",
-          false,
-        ),
-      );
-      bubbles.push(buildVideoPlanBubble(`${message.id}-form-plan`, parsedFormSubmission));
+    if (isUser && isFormSubmissionMessage(rawContent)) {
       return bubbles;
     }
 
