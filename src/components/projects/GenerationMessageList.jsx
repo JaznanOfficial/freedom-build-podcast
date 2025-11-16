@@ -80,6 +80,31 @@ function isFormSubmissionMessage(content) {
   return typeof content === "string" && content.startsWith("FORM_SUBMISSION::");
 }
 
+function parseFormSubmissionMessage(content) {
+  if (!isFormSubmissionMessage(content)) {
+    return null;
+  }
+
+  const newlineIndex = content.indexOf("\n");
+  if (newlineIndex === -1) {
+    return null;
+  }
+
+  const payloadText = content.slice(newlineIndex + 1).trim();
+  if (!payloadText) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(payloadText);
+  } catch (error) {
+    requestAnimationFrame(() => {
+      throw error;
+    });
+    return null;
+  }
+}
+
 function resolveAssistantContent({ content, isUser, toolState }) {
   if (isUser) {
     if (isFormSubmissionMessage(content)) {
@@ -108,7 +133,22 @@ export function GenerationMessageList({ messages }) {
     const isUser = message.role === "user";
     const bubbles = [];
 
-    let content = extractTextContent(message);
+    const rawContent = extractTextContent(message);
+    const parsedFormSubmission = isUser ? parseFormSubmissionMessage(rawContent) : null;
+
+    if (parsedFormSubmission) {
+      bubbles.push(
+        buildTextBubble(
+          `${message.id}-form-confirmation`,
+          "Perfect! Here's the updated video request.",
+          false,
+        ),
+      );
+      bubbles.push(buildVideoPlanBubble(`${message.id}-form-plan`, parsedFormSubmission));
+      return bubbles;
+    }
+
+    let content = rawContent;
     const videoToolParts = isUser ? [] : collectVideoToolParts(message);
     const videoPlan = isUser ? null : deriveVideoPlan(videoToolParts);
     const toolState = isUser ? null : deriveVideoToolState(videoToolParts);
@@ -245,11 +285,7 @@ function MissingFieldInlineForm({ fields, plan }) {
       imageUrl: formState.imageUrl.trim(),
     };
 
-    const message = [
-      "FORM_SUBMISSION::missing-field-inline-form",
-      "Please call the generateVideoPlan tool with the following payload to update the video request:",
-      JSON.stringify(payloadObject, null, 2),
-    ].join("\n");
+    const message = `FORM_SUBMISSION::missing-field-inline-form\n${JSON.stringify(payloadObject)}`;
 
     try {
       await sendMessage({

@@ -6,6 +6,14 @@ import {
 } from "../videoSchema";
 
 const GENERATE_VIDEO_TOOL_NAME = "generateVideoPlan";
+const REQUIRED_FIELDS = ["audioUrl", "imageUrl"];
+
+function normalize(value) {
+  if (typeof value !== "string") {
+    return "";
+  }
+  return value.trim();
+}
 
 export const generateVideoTool = tool({
   name: GENERATE_VIDEO_TOOL_NAME,
@@ -17,20 +25,29 @@ export const generateVideoTool = tool({
       return null;
     }
 
-    return {
+    const sanitized = {
       type: "video-request",
-      title: payload.title ?? "",
-      description: payload.description ?? "",
-      prompt: payload.prompt ?? "",
+      title: normalize(payload.title),
+      description: normalize(payload.description),
+      prompt: normalize(payload.prompt),
       resolution: ALLOWED_RESOLUTIONS.includes(payload.resolution ?? "")
         ? payload.resolution
         : DEFAULT_RESOLUTION,
-      audioUrl: payload.audioUrl ?? "",
-      imageUrl: payload.imageUrl ?? "",
-      missingFields: Array.isArray(payload.missingFields)
-        ? payload.missingFields
-        : [],
+      audioUrl: normalize(payload.audioUrl),
+      imageUrl: normalize(payload.imageUrl),
     };
+
+    const providedMissing = Array.isArray(payload.missingFields)
+      ? payload.missingFields.filter((field) => REQUIRED_FIELDS.includes(field))
+      : [];
+
+    const computedMissing = REQUIRED_FIELDS.filter((field) => !sanitized[field]);
+
+    sanitized.missingFields = Array.from(
+      new Set([...providedMissing, ...computedMissing]),
+    );
+
+    return sanitized;
   },
 });
 

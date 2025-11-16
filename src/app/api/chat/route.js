@@ -22,8 +22,6 @@ When the user asks to create or update a video (including avatar or podcast vide
   "missingFields": ["title", "description", "audioUrl", "imageUrl"]
 }
 
-When you receive a user message that begins with "FORM_SUBMISSION::missing-field-inline-form", treat everything after the first newline as a JSON payload supplied by the user. Parse that JSON exactly (do not add new keys) and immediately call the "${GENERATE_VIDEO_TOOL_NAME}" tool using those values. After calling the tool, reply with a concise confirmation summarising the updated plan, and include the structured object in the response so the UI can render it.
-
 After the tool executes, ask for any missing items in a friendly tone and summarise the result briefly unless the user prefers raw JSON. For other requests, respond conversationally without calling tools.`,
   tools: {
     [GENERATE_VIDEO_TOOL_NAME]: generateVideoTool,
