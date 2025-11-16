@@ -1,144 +1,22 @@
 "use client";
 
+import { useId, useState } from "react";
 import { Response } from "@/components/ai-elements/response";
-import { GENERATE_VIDEO_TOOL_NAME } from "@/constants/aiTools";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import {
+  DEFAULT_VIDEO_STATUS_MESSAGE,
+  VIDEO_TOOL_STATUS_MESSAGES,
+  collectVideoToolParts,
+  deriveVideoPlan,
+  deriveVideoToolState,
+  extractTextContent,
+  findLatestVideoPlan,
+} from "./videoToolUtils";
 import { GenerationVideoPlanCard } from "./GenerationVideoPlanCard";
+import { useProjectChat } from "./ChatProvider";
 
-const VIDEO_TOOL_PART_TYPE = `tool-${GENERATE_VIDEO_TOOL_NAME}`;
-const VIDEO_TOOL_STATUS_MESSAGES = {
-  "input-streaming": "Jaznan is cooking structured data...",
-  "input-available": "Jaznan is reviewing the ingredients...",
-  "output-streaming": "Jaznan is finishing the video brief...",
-  "output-pending": "Jaznan is finishing the video brief...",
-  "output-error": "Jaznan hit a snag while preparing the video brief.",
-};
-const DEFAULT_VIDEO_STATUS_MESSAGE = "Jaznan is cooking structured data...";
-
-function extractTextContent(message) {
-  if (Array.isArray(message.parts)) {
-    return message.parts
-      .filter((part) => part?.type === "text" && typeof part.text === "string")
-      .map((part) => part.text)
-      .join("");
-  }
-
-  if (typeof message.content === "string") {
-    return message.content;
-  }
-
-  return "";
-}
-
-function visitParts(node, callback) {
-  if (!node) {
-    return;
-  }
-
-  if (Array.isArray(node)) {
-    for (const child of node) {
-      visitParts(child, callback);
-    }
-    return;
-  }
-
-  if (typeof node === "object") {
-    callback(node);
-
-    if (Array.isArray(node.parts)) {
-      visitParts(node.parts, callback);
-    }
-  }
-}
-
-function collectVideoToolParts(message) {
-  const parts = [];
-
-  visitParts(message?.parts, (part) => {
-    if (!part?.type) {
-      return;
-    }
-
-    if (
-      part.type === VIDEO_TOOL_PART_TYPE ||
-      (part.type === "dynamic-tool" && part.toolName === GENERATE_VIDEO_TOOL_NAME)
-    ) {
-      parts.push(part);
-    }
-  });
-
-  visitParts(message?.content, (part) => {
-    if (!part?.type) {
-      return;
-    }
-
-    if (
-      part.type === VIDEO_TOOL_PART_TYPE ||
-      (part.type === "dynamic-tool" && part.toolName === GENERATE_VIDEO_TOOL_NAME)
-    ) {
-      parts.push(part);
-    }
-  });
-
-  if (Array.isArray(message?.toolInvocations)) {
-    for (const invocation of message.toolInvocations) {
-      if (invocation?.toolName === GENERATE_VIDEO_TOOL_NAME) {
-        parts.push(invocation);
-      }
-    }
-  }
-
-  return parts;
-}
-
-function deriveVideoToolState(parts) {
-  if (!Array.isArray(parts) || parts.length === 0) {
-    return null;
-  }
-
-  const prioritizedStates = [
-    "output-error",
-    "output-streaming",
-    "output-pending",
-    "input-streaming",
-    "input-available",
-  ];
-
-  for (const state of prioritizedStates) {
-    const match = parts.find((part) => part?.state === state);
-    if (match) {
-      return match.state;
-    }
-  }
-
-  const completed = parts.find((part) => part?.state === "output-available" || part?.state === "result");
-  return completed?.state ?? null;
-}
-
-function deriveVideoPlan(parts) {
-  if (!Array.isArray(parts)) {
-    return null;
-  }
-
-  const candidates = parts.filter((part) =>
-    ["output-available", "result"].includes(part?.state ?? ""),
-  );
-
-  for (const candidate of candidates) {
-    if (candidate?.output && typeof candidate.output === "object") {
-      return candidate.output;
-    }
-
-    if (candidate?.result && typeof candidate.result === "object") {
-      return candidate.result;
-    }
-
-    if (candidate?.data && typeof candidate.data === "object") {
-      return candidate.data;
-    }
-  }
-
-  return null;
-}
+const REQUIRED_TOOL_FIELDS = ["audioUrl", "imageUrl"];
 
 function buildTextBubble(messageId, content, isUser) {
   const alignment = isUser ? "justify-end" : "justify-start";
@@ -201,8 +79,161 @@ export function GenerationMessageList({ messages }) {
 
     if (!isUser && videoPlan) {
       bubbles.push(buildVideoPlanBubble(message.id, videoPlan));
+      maybePromptForMissingFields({
+        bubbles,
+        message,
+        messages,
+        videoPlan,
+      });
     }
 
     return bubbles;
   });
+}
+
+function maybePromptForMissingFields({ videoPlan, messages, message, bubbles }) {
+  const missing = Array.isArray(videoPlan?.missingFields) ? videoPlan.missingFields : [];
+  const hasMissingRequired = REQUIRED_TOOL_FIELDS.some(
+    (field) => videoPlan?.[field] == null || videoPlan?.[field] === "",
+  );
+
+  if (!hasMissingRequired || missing.length === 0) {
+    return;
+  }
+
+  const missingList = missing.join(" and ");
+  const latestPlan = findLatestVideoPlan(messages);
+  const alreadyPrompted = latestPlan?.messageId === message.id;
+
+  if (alreadyPrompted) {
+    return;
+  }
+
+  bubbles.push(
+    buildTextBubble(
+      `${message.id}-missing-input`,
+      `I still need the ${missingList}. Please share the ${missingList} URLs to continue.`,
+      false,
+    ),
+  );
+  bubbles.push(buildMissingFieldFormBubble(message.id, missing));
+}
+
+function buildMissingFieldFormBubble(messageId, missingFields) {
+  return (
+    <div className="flex justify-start" key={`${messageId}-missing-input-form`}>
+      <div className="max-w-[85%]">
+        <MissingFieldInlineForm fields={missingFields} />
+      </div>
+    </div>
+  );
+}
+
+const FIELD_LABELS = {
+  audioUrl: "Audio URL",
+  imageUrl: "Image URL",
+};
+
+const FIELD_PLACEHOLDERS = {
+  audioUrl: "https://example.com/voiceover.mp3",
+  imageUrl: "https://example.com/thumbnail.jpg",
+};
+
+function MissingFieldInlineForm({ fields }) {
+  const { sendMessage, status } = useProjectChat();
+  const baseId = useId();
+  const [values, setValues] = useState(() =>
+    Object.fromEntries(fields.map((field) => [field, ""])),
+  );
+  const [isSubmitted, setIsSubmitted] = useState(false);
+
+  const isStreaming = status === "streaming";
+  const allFilled = fields.every((field) => values[field]?.trim());
+
+  const handleChange = (field) => (event) => {
+    setValues((previous) => ({ ...previous, [field]: event.target.value }));
+  };
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    if (!allFilled || isStreaming) {
+      return;
+    }
+
+    const payload = fields
+      .map((field) => `${field}: ${values[field].trim()}`)
+      .join("\n");
+
+    sendMessage({ parts: [{ type: "text", text: payload }] });
+    setIsSubmitted(true);
+  };
+
+  return (
+    <form
+      className={cn(
+        "bg-primary/5",
+        "border",
+        "border-dashed",
+        "border-primary/40",
+        "px-3",
+        "py-3",
+        "rounded-lg",
+        "space-y-3",
+        "text-sm",
+      )}
+      onSubmit={handleSubmit}
+    >
+      <p className="font-medium text-primary text-xs">
+        Drop the missing links below and I'll slot them into the plan.
+      </p>
+      {fields.map((field) => (
+        <div className="space-y-1" key={field}>
+          <label
+            className={cn(
+              "block",
+              "font-semibold",
+              "text-muted-foreground",
+              "text-xs",
+              "tracking-wide",
+              "uppercase",
+            )}
+            htmlFor={`${baseId}-${field}`}
+          >
+            {FIELD_LABELS[field] ?? field}
+          </label>
+          <input
+            className={cn(
+              "bg-background",
+              "border",
+              "border-input",
+              "px-3",
+              "py-2",
+              "rounded-md",
+              "shadow-sm",
+              "text-foreground",
+              "text-sm",
+              "w-full",
+              "focus-visible:outline-none",
+              "focus-visible:ring-2",
+              "focus-visible:ring-primary",
+            )}
+            onChange={handleChange(field)}
+            placeholder={FIELD_PLACEHOLDERS[field] ?? "https://"}
+            id={`${baseId}-${field}`}
+            type="url"
+            value={values[field]}
+          />
+        </div>
+      ))}
+      <Button
+        className="w-full"
+        disabled={isStreaming || !allFilled || isSubmitted}
+        size="sm"
+        type="submit"
+        variant="default"
+      >
+        {isSubmitted ? "Submitted" : "Share URLs"}
+      </Button>
+    </form>
+  );
 }
