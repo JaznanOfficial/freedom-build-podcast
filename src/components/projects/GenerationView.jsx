@@ -9,6 +9,24 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 export function GenerationView() {
   useProjectChat();
 
+  const sections = [
+    {
+      id: "videos",
+      title: "Videos",
+      empty: "No videos yet. Ask Jaznan to craft one!",
+    },
+    {
+      id: "image-resources",
+      title: "Resources (Image)",
+      empty: "Bring your reference images here soon.",
+    },
+    {
+      id: "audio-resources",
+      title: "Resources (Audio)",
+      empty: "Upload voiceovers or music when you're ready.",
+    },
+  ];
+
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col gap-4 lg:grid lg:grid-cols-[420px_1fr]">
       <GenerationSidebar className="hidden lg:block" />
@@ -36,8 +54,32 @@ export function GenerationView() {
             </SheetContent>
           </Sheet>
         </div>
-        <div className="flex min-h-0 flex-1 items-center justify-center rounded-lg border bg-background text-muted-foreground text-sm">
-          Start a conversation with Jaznan using the chat panel.
+        <div className="flex min-h-0 flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto rounded-lg border bg-background p-6">
+            <div className="grid h-full grid-rows-3 gap-6">
+              {sections.map((section) => (
+                <section
+                  className="flex min-h-0 flex-col rounded-lg border border-muted bg-muted/30 p-5 shadow-sm"
+                  key={section.id}
+                >
+                  <header className="flex items-center justify-between">
+                    <h2 className="text-base font-semibold text-foreground">
+                      {section.title}
+                    </h2>
+                  </header>
+                  <div className="mt-4 flex flex-1 items-center justify-center rounded-md border border-dashed border-muted-foreground/40 bg-background/80 text-center text-muted-foreground text-sm">
+                    {section.empty}
+                  </div>
+                  <button
+                    className="mt-4 text-sm font-medium text-primary transition hover:text-primary/80"
+                    type="button"
+                  >
+                    See all
+                  </button>
+                </section>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </div>
