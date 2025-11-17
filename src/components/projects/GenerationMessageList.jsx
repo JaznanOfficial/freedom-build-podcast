@@ -29,7 +29,9 @@ const IMAGE_ASPECT_RATIO_OPTIONS = [
   "21:9",
 ];
 const IMAGE_OUTPUT_FORMAT_OPTIONS = ["png", "jpeg"];
+const AUDIO_VOICE_OPTIONS = ["Alloy", "Verse", "Calm", "Vibrant"];
 const FORM_SUBMISSION_IMAGE_PROMPT = "FORM_SUBMISSION::image-prompt";
+const FORM_SUBMISSION_AUDIO_PROMPT = "FORM_SUBMISSION::audio-prompt";
 
 function buildTextBubble(messageId, content, isUser) {
   const alignment = isUser ? "justify-end" : "justify-start";
@@ -41,6 +43,131 @@ function buildTextBubble(messageId, content, isUser) {
         {isUser ? content : <Response>{content}</Response>}
       </div>
     </div>
+  );
+}
+
+function AudioPromptInlineForm() {
+  const { sendMessage, status } = useProjectChat();
+  const baseId = useId();
+  const [formState, setFormState] = useState({
+    script: "",
+    voice: "",
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const isStreaming = status === "streaming";
+  const scriptMissing = typeof formState.script !== "string" || formState.script.trim() === "";
+  const canSubmit = !(isStreaming || isSubmitting || scriptMissing);
+
+  const handleChange = (field) => (event) => {
+    const { value } = event.target;
+    setFormState((previous) => ({ ...previous, [field]: value }));
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    if (!canSubmit) {
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    const payload = {
+      script: formState.script.trim(),
+    };
+
+    if (typeof formState.voice === "string" && formState.voice.trim() !== "") {
+      payload.voice = formState.voice.trim();
+    }
+
+    const message = `${FORM_SUBMISSION_AUDIO_PROMPT}\n${JSON.stringify(payload)}`;
+
+    try {
+      await sendMessage({
+        parts: [{ type: "text", text: message }],
+      });
+      setFormState({ script: "", voice: "" });
+    } catch (error) {
+      requestAnimationFrame(() => {
+        throw error;
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <form
+      className={cn(
+        "bg-primary/5",
+        "border",
+        "border-dashed",
+        "border-primary/40",
+        "px-3",
+        "py-3",
+        "rounded-lg",
+        "space-y-3",
+        "text-sm",
+      )}
+      onSubmit={handleSubmit}
+    >
+      <p className="font-medium text-primary text-xs">Share the audio details and I’ll handle the rest.</p>
+      <div className="space-y-2">
+        <div className="space-y-1">
+          <label
+            className={cn(
+              "block",
+              "font-semibold",
+              "text-muted-foreground",
+              "text-xs",
+              "tracking-wide",
+              "uppercase",
+            )}
+            htmlFor={`${baseId}-script`}
+          >
+            Script<span className="text-destructive">*</span>
+          </label>
+          <textarea
+            className={cn(...TEXT_INPUT_CLASSES, "min-h-[96px]")}
+            id={`${baseId}-script`}
+            onChange={handleChange("script")}
+            placeholder="Provide the narration or lines for the audio"
+            value={formState.script}
+          />
+        </div>
+        <div className="space-y-1">
+          <label
+            className={cn(
+              "block",
+              "font-semibold",
+              "text-muted-foreground",
+              "text-xs",
+              "tracking-wide",
+              "uppercase",
+            )}
+            htmlFor={`${baseId}-voice`}
+          >
+            Voice (optional)
+          </label>
+          <select
+            className={cn(...TEXT_INPUT_CLASSES)}
+            id={`${baseId}-voice`}
+            onChange={handleChange("voice")}
+            value={formState.voice}
+          >
+            <option value="">Select voice</option>
+            {AUDIO_VOICE_OPTIONS.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <Button className="w-full" disabled={!canSubmit} size="sm" type="submit" variant="default">
+        {isSubmitting ? "Sent" : "Send"}
+      </Button>
+    </form>
   );
 }
 
@@ -260,6 +387,62 @@ function buildImagePromptFormBubble({ messageId }) {
   );
 }
 
+function buildAudioRequestBubble(messageId, request) {
+  const pretty = JSON.stringify(request, null, 2);
+
+  return (
+    <div className="flex justify-start" key={`${messageId}-audio-request`}>
+      <div
+        className={cn(
+          "bg-muted",
+          "max-w-[85%]",
+          "px-3",
+          "py-2",
+          "rounded-lg",
+          "shadow-sm",
+          "text-foreground",
+          "text-sm",
+        )}
+      >
+        <p
+          className={cn(
+            "font-semibold",
+            "text-muted-foreground",
+            "text-xs",
+            "tracking-wide",
+            "uppercase",
+          )}
+        >
+          Audio request object
+        </p>
+        <pre
+          className={cn(
+            "break-words",
+            "font-mono",
+            "leading-5",
+            "mt-2",
+            "text-foreground",
+            "text-xs",
+            "whitespace-pre-wrap",
+          )}
+        >
+          {pretty}
+        </pre>
+      </div>
+    </div>
+  );
+}
+
+function buildAudioPromptFormBubble({ messageId }) {
+  return (
+    <div className="flex justify-start" key={`${messageId}-audio-prompt-form`}>
+      <div className="max-w-[85%]">
+        <AudioPromptInlineForm />
+      </div>
+    </div>
+  );
+}
+
 function buildVideoPlanBubble(messageId, plan) {
   const pretty = JSON.stringify(plan, null, 2);
 
@@ -397,6 +580,38 @@ function parseImageRequest(content) {
   return null;
 }
 
+function parseAudioRequest(content) {
+  if (typeof content !== "string") {
+    return null;
+  }
+
+  const trimmed = content.trim();
+  if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (parsed && typeof parsed === "object" && typeof parsed.script === "string") {
+      const script = parsed.script.trim();
+      if (!script) {
+        return null;
+      }
+      const result = { script };
+      if (typeof parsed.voice === "string" && parsed.voice.trim() !== "") {
+        result.voice = parsed.voice.trim();
+      }
+      return result;
+    }
+  } catch (error) {
+    requestAnimationFrame(() => {
+      throw error;
+    });
+  }
+
+  return null;
+}
+
 function shouldShowImagePromptForm(content) {
   if (typeof content !== "string") {
     return false;
@@ -416,12 +631,35 @@ function shouldShowImagePromptForm(content) {
   return false;
 }
 
+function shouldShowAudioPromptForm(content) {
+  if (typeof content !== "string") {
+    return false;
+  }
+
+  const normalized = content.toLowerCase();
+  if (normalized.includes("share the script")) {
+    return true;
+  }
+  if (normalized.includes("provide the script")) {
+    return true;
+  }
+  if (normalized.includes("audio script")) {
+    return true;
+  }
+  if (normalized.includes("audio prompt") && normalized.includes("voice")) {
+    return true;
+  }
+
+  return false;
+}
+
 export function GenerationMessageList({ messages }) {
   if (!Array.isArray(messages) || messages.length === 0) {
     return null;
   }
 
   let lastImagePromptSubmission = null;
+  let lastAudioPromptSubmission = null;
 
   return messages.flatMap((message) => {
     const isUser = message.role === "user";
@@ -432,8 +670,15 @@ export function GenerationMessageList({ messages }) {
     if (isUser && isFormSubmissionMessage(rawContent)) {
       if (rawContent.startsWith(FORM_SUBMISSION_IMAGE_PROMPT)) {
         lastImagePromptSubmission = parseFormSubmissionMessage(rawContent);
+      } else if (rawContent.startsWith(FORM_SUBMISSION_AUDIO_PROMPT)) {
+        lastAudioPromptSubmission = parseFormSubmissionMessage(rawContent);
       }
       return bubbles;
+    }
+
+    if (isUser) {
+      lastImagePromptSubmission = null;
+      lastAudioPromptSubmission = null;
     }
 
     let content = rawContent;
@@ -445,32 +690,52 @@ export function GenerationMessageList({ messages }) {
 
     const originalContent = content;
     let imageRequest = null;
+    let audioRequest = null;
 
     if (!isUser) {
-      imageRequest = parseImageRequest(content);
-      if (imageRequest) {
-        const submissionPrompt = lastImagePromptSubmission?.prompt;
-        if (typeof submissionPrompt === "string") {
-          const trimmedSubmissionPrompt = submissionPrompt.trim();
-          if (trimmedSubmissionPrompt && trimmedSubmissionPrompt === imageRequest.prompt) {
+      audioRequest = parseAudioRequest(content);
+      if (audioRequest) {
+        const submissionScript = lastAudioPromptSubmission?.script;
+        if (typeof submissionScript === "string") {
+          const trimmedSubmissionScript = submissionScript.trim();
+          if (trimmedSubmissionScript && trimmedSubmissionScript === audioRequest.script) {
             if (
-              !imageRequest.aspect_ratio &&
-              typeof lastImagePromptSubmission?.aspect_ratio === "string" &&
-              lastImagePromptSubmission.aspect_ratio.trim() !== ""
+              !audioRequest.voice &&
+              typeof lastAudioPromptSubmission?.voice === "string" &&
+              lastAudioPromptSubmission.voice.trim() !== ""
             ) {
-              imageRequest.aspect_ratio = lastImagePromptSubmission.aspect_ratio.trim();
-            }
-            if (
-              !imageRequest.output_format &&
-              typeof lastImagePromptSubmission?.output_format === "string" &&
-              lastImagePromptSubmission.output_format.trim() !== ""
-            ) {
-              imageRequest.output_format = lastImagePromptSubmission.output_format.trim();
+              audioRequest.voice = lastAudioPromptSubmission.voice.trim();
             }
           }
         }
-        lastImagePromptSubmission = null;
+        lastAudioPromptSubmission = null;
         content = "";
+      } else {
+        imageRequest = parseImageRequest(content);
+        if (imageRequest) {
+          const submissionPrompt = lastImagePromptSubmission?.prompt;
+          if (typeof submissionPrompt === "string") {
+            const trimmedSubmissionPrompt = submissionPrompt.trim();
+            if (trimmedSubmissionPrompt && trimmedSubmissionPrompt === imageRequest.prompt) {
+              if (
+                !imageRequest.aspect_ratio &&
+                typeof lastImagePromptSubmission?.aspect_ratio === "string" &&
+                lastImagePromptSubmission.aspect_ratio.trim() !== ""
+              ) {
+                imageRequest.aspect_ratio = lastImagePromptSubmission.aspect_ratio.trim();
+              }
+              if (
+                !imageRequest.output_format &&
+                typeof lastImagePromptSubmission?.output_format === "string" &&
+                lastImagePromptSubmission.output_format.trim() !== ""
+              ) {
+                imageRequest.output_format = lastImagePromptSubmission.output_format.trim();
+              }
+            }
+          }
+          lastImagePromptSubmission = null;
+          content = "";
+        }
       }
     }
 
@@ -478,8 +743,16 @@ export function GenerationMessageList({ messages }) {
       bubbles.push(buildTextBubble(message.id, content, isUser));
     }
 
+    if (!isUser && shouldShowAudioPromptForm(originalContent) && !audioRequest) {
+      bubbles.push(buildAudioPromptFormBubble({ messageId: message.id }));
+    }
+
     if (!isUser && shouldShowImagePromptForm(originalContent) && !imageRequest) {
       bubbles.push(buildImagePromptFormBubble({ messageId: message.id }));
+    }
+
+    if (!isUser && audioRequest) {
+      bubbles.push(buildAudioRequestBubble(message.id, audioRequest));
     }
 
     if (!isUser && imageRequest) {

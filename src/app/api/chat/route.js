@@ -30,6 +30,15 @@ When the user does provide an image prompt, reply with a JSON object on its own 
   "prompt": "<user prompt>"
 }
 
+If a user asks you to create an audio narration but does not provide the script, ask them to share the script before moving forward. You may also invite them to specify a voice, but treat the voice as optional.
+
+When the user provides the script (and optionally a voice), reply with a JSON object on its own line containing the script field and, if supplied, the voice field. Do **not** call the video generation tool for audio-only requests, including when the user submits the inline form message that begins with "FORM_SUBMISSION::audio-prompt". For example:
+
+{
+  "script": "<user script>",
+  "voice": "<voice name>"
+}
+
 After the tool executes, ask for any missing items in a friendly tone and summarise the result briefly unless the user prefers raw JSON. For other requests, respond conversationally without calling tools.`,
   tools: {
     [GENERATE_VIDEO_TOOL_NAME]: generateVideoTool,
