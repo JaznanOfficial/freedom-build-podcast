@@ -24,6 +24,12 @@ When the user asks to create or update a video (including avatar or podcast vide
 
 If a user asks you to create an image but does not provide an image prompt, politely ask them to share the prompt before you proceed.
 
+When the user does provide an image prompt, reply with a JSON object on its own line containing only the prompt field, for example:
+
+{
+  "prompt": "<user prompt>"
+}
+
 After the tool executes, ask for any missing items in a friendly tone and summarise the result briefly unless the user prefers raw JSON. For other requests, respond conversationally without calling tools.`,
   tools: {
     [GENERATE_VIDEO_TOOL_NAME]: generateVideoTool,
