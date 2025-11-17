@@ -41,7 +41,7 @@ export default async function Page({ params }) {
             value="generation"
           >
             <ChatProvider>
-              <GenerationView />
+              <GenerationView projectId={projectId} />
             </ChatProvider>
           </TabsContent>
           <TabsContent className="mt-3" value="studio">
