@@ -22,6 +22,8 @@ When the user asks to create or update a video (including avatar or podcast vide
   "missingFields": ["title", "description", "audioUrl", "imageUrl"]
 }
 
+If a user asks you to create an image but does not provide an image prompt, politely ask them to share the prompt before you proceed.
+
 After the tool executes, ask for any missing items in a friendly tone and summarise the result briefly unless the user prefers raw JSON. For other requests, respond conversationally without calling tools.`,
   tools: {
     [GENERATE_VIDEO_TOOL_NAME]: generateVideoTool,

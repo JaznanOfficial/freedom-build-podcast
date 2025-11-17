@@ -1,10 +1,13 @@
 "use client";
 
-import Link from "next/link";
 import { PanelLeftOpen } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 import { useProjectChat } from "@/components/projects/ChatProvider";
+import { GenerationAudioResourceCard } from "@/components/projects/GenerationAudioResourceCard";
+import { GenerationImageResourceCard } from "@/components/projects/GenerationImageResourceCard";
 import { GenerationSidebar } from "@/components/projects/GenerationSidebar";
+import { GenerationVideoResourceCard } from "@/components/projects/GenerationVideoResourceCard";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -14,9 +17,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { GenerationAudioResourceCard } from "@/components/projects/GenerationAudioResourceCard";
-import { GenerationImageResourceCard } from "@/components/projects/GenerationImageResourceCard";
-import { GenerationVideoResourceCard } from "@/components/projects/GenerationVideoResourceCard";
 import {
   demoAudioResources,
   demoImageResources,
@@ -134,14 +134,20 @@ export function GenerationView({ projectId }) {
                       {isImageSection && hasItems ? (
                         <div className="mt-4 grid flex-1 grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                           {items.map((item) => (
-                            <GenerationImageResourceCard item={item} key={item.id} />
+                            <GenerationImageResourceCard
+                              item={item}
+                              key={item.id}
+                            />
                           ))}
                         </div>
                       ) : null}
                       {isAudioSection && hasItems ? (
                         <div className="mt-4 grid flex-1 grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                           {items.map((item) => (
-                            <GenerationAudioResourceCard item={item} key={item.id} />
+                            <GenerationAudioResourceCard
+                              item={item}
+                              key={item.id}
+                            />
                           ))}
                         </div>
                       ) : null}
@@ -151,7 +157,12 @@ export function GenerationView({ projectId }) {
                         </div>
                       ) : null}
                       {section.href ? (
-                        <Button asChild className="mt-4 w-fit" size="sm" variant="ghost">
+                        <Button
+                          asChild
+                          className="mt-4 w-fit"
+                          size="sm"
+                          variant="ghost"
+                        >
                           <Link href={section.href}>See all</Link>
                         </Button>
                       ) : null}
