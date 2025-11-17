@@ -445,7 +445,11 @@ function buildAudioPromptFormBubble({ messageId }) {
 }
 
 function buildVideoPlanBubble(messageId, plan) {
-  const pretty = JSON.stringify(plan, null, 2);
+  const displayPlan =
+    plan && typeof plan === "object"
+      ? (({ missingFields: _ignored, ...rest }) => rest)(plan)
+      : plan;
+  const pretty = JSON.stringify(displayPlan, null, 2);
 
   return (
     <div className="flex justify-start" key={`${messageId}-video-plan`}>
