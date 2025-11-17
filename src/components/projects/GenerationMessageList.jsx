@@ -57,7 +57,8 @@ function AudioPromptInlineForm() {
 
   const isStreaming = status === "streaming";
   const scriptMissing = typeof formState.script !== "string" || formState.script.trim() === "";
-  const canSubmit = !(isStreaming || isSubmitting || scriptMissing);
+  const voiceMissing = typeof formState.voice !== "string" || formState.voice.trim() === "";
+  const canSubmit = !(isStreaming || isSubmitting || scriptMissing || voiceMissing);
 
   const handleChange = (field) => (event) => {
     const { value } = event.target;
@@ -72,13 +73,13 @@ function AudioPromptInlineForm() {
 
     setIsSubmitting(true);
 
-    const payload = {
-      script: formState.script.trim(),
-    };
+    const trimmedScript = formState.script.trim();
+    const trimmedVoice = formState.voice.trim();
 
-    if (typeof formState.voice === "string" && formState.voice.trim() !== "") {
-      payload.voice = formState.voice.trim();
-    }
+    const payload = {
+      script: trimmedScript,
+      voice: trimmedVoice,
+    };
 
     const message = `${FORM_SUBMISSION_AUDIO_PROMPT}\n${JSON.stringify(payload)}`;
 
@@ -86,7 +87,7 @@ function AudioPromptInlineForm() {
       await sendMessage({
         parts: [{ type: "text", text: message }],
       });
-      setFormState({ script: "", voice: "" });
+      setFormState({ script: "", voice: trimmedVoice });
     } catch (error) {
       requestAnimationFrame(() => {
         throw error;
@@ -147,7 +148,7 @@ function AudioPromptInlineForm() {
             )}
             htmlFor={`${baseId}-voice`}
           >
-            Voice (optional)
+            Voice<span className="text-destructive">*</span>
           </label>
           <select
             className={cn(...TEXT_INPUT_CLASSES)}
@@ -592,16 +593,13 @@ function parseAudioRequest(content) {
 
   try {
     const parsed = JSON.parse(trimmed);
-    if (parsed && typeof parsed === "object" && typeof parsed.script === "string") {
+    if (parsed && typeof parsed === "object" && typeof parsed.script === "string" && typeof parsed.voice === "string") {
       const script = parsed.script.trim();
-      if (!script) {
+      const voice = parsed.voice.trim();
+      if (!script || !voice) {
         return null;
       }
-      const result = { script };
-      if (typeof parsed.voice === "string" && parsed.voice.trim() !== "") {
-        result.voice = parsed.voice.trim();
-      }
-      return result;
+      return { script, voice };
     }
   } catch (error) {
     requestAnimationFrame(() => {
@@ -647,6 +645,15 @@ function shouldShowAudioPromptForm(content) {
     return true;
   }
   if (normalized.includes("audio prompt") && normalized.includes("voice")) {
+    return true;
+  }
+  if (normalized.includes("please provide") && normalized.includes("script") && normalized.includes("voice")) {
+    return true;
+  }
+  if (normalized.includes("narration script") && normalized.includes("desired voice")) {
+    return true;
+  }
+  if (normalized.includes("once i have both") && normalized.includes("voice")) {
     return true;
   }
 
