@@ -1,7 +1,8 @@
 "use client";
 
-import { Pause, Play } from "lucide-react";
+import { Pause, Play, Volume2 } from "lucide-react";
 import { useId, useRef, useState } from "react";
+import { AUDIO_VOICE_OPTIONS, VOICES } from "@/data/voices";
 import { Response } from "@/components/ai-elements/response";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -30,28 +31,7 @@ const IMAGE_ASPECT_RATIO_OPTIONS = [
   "21:9",
 ];
 const IMAGE_OUTPUT_FORMAT_OPTIONS = ["png", "jpeg"];
-const AUDIO_VOICE_OPTIONS = [
-  {
-    value: "Alloy",
-    label: "Alloy",
-    previewUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
-  },
-  {
-    value: "Verse",
-    label: "Verse",
-    previewUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
-  },
-  {
-    value: "Calm",
-    label: "Calm",
-    previewUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
-  },
-  {
-    value: "Vibrant",
-    label: "Vibrant",
-    previewUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3",
-  },
-];
+// Voice options are now imported from @/data/voices
 const FORM_SUBMISSION_IMAGE_PROMPT = "FORM_SUBMISSION::image-prompt";
 const FORM_SUBMISSION_AUDIO_PROMPT = "FORM_SUBMISSION::audio-prompt";
 
@@ -246,10 +226,15 @@ function AudioPromptInlineForm() {
                       type="radio"
                       value={option.value}
                     />
-                    <span className="inline-flex size-8 items-center justify-center rounded-full border border-primary/40 bg-background text-primary">
-                      {option.label.charAt(0)}
+                    <span className="inline-flex size-8 flex-shrink-0 items-center justify-center rounded-full border border-primary/40 bg-background text-primary">
+                      <Volume2 className="size-4" />
                     </span>
-                    <span className="font-medium text-foreground">{option.label}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-foreground truncate">{option.label}</p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {VOICES.find(v => v.name === option.value)?.gender || 'Voice'}
+                      </p>
+                    </div>
                   </div>
                   <button
                     aria-label={`${isPlaying ? "Pause" : "Play"} ${option.label} preview`}
@@ -274,7 +259,9 @@ function AudioPromptInlineForm() {
             onPause={() => setPreviewingVoice(null)}
             preload="none"
             ref={audioRef}
-          />
+          >
+            <track kind="captions" />
+          </audio>
         </div>
       </div>
       <Button className="w-full" disabled={!canSubmit} size="sm" type="submit" variant="default">
