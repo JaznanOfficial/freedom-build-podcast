@@ -232,7 +232,7 @@ function AudioPromptInlineForm() {
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
+                      <p className="text-xs text-muted-foreground mt-0.5 whitespace-normal">
                         {option.description}
                       </p>
                     </div>
@@ -359,7 +359,7 @@ function ImagePromptInlineForm() {
         Share the image details here and I’ll pass them along.
       </p>
       <div className="space-y-2">
-        <div className="space-y-1">
+        <div className="space-y-1 flex-shrink-0">
           <label
             className={cn(
               "block",
@@ -381,7 +381,7 @@ function ImagePromptInlineForm() {
             value={formState.prompt}
           />
         </div>
-        <div className="space-y-1">
+        <div className="space-y-1 flex-shrink-0">
           <label
             className={cn(
               "block",
@@ -409,7 +409,7 @@ function ImagePromptInlineForm() {
             ))}
           </select>
         </div>
-        <div className="space-y-1">
+        <div className="space-y-1 flex-shrink-0">
           <label
             className={cn(
               "block",
@@ -438,9 +438,11 @@ function ImagePromptInlineForm() {
           </select>
         </div>
       </div>
-      <Button className="w-full" disabled={!canSubmit} size="sm" type="submit" variant="default">
-        {isSubmitting ? "Sent" : "Send"}
-      </Button>
+      <div className="pt-2">
+        <Button className="w-full" disabled={!canSubmit} size="sm" type="submit" variant="default">
+          {isSubmitting ? "Sent" : "Send"}
+        </Button>
+      </div>
     </form>
   );
 }
@@ -1055,7 +1057,7 @@ function MissingFieldInlineForm({ fields, plan }) {
         Fill in the details below and I’ll craft the video plan for you.
       </p>
       <div className="space-y-2">
-        <div className="space-y-1">
+        <div className="space-y-1 flex-shrink-0">
           <label
             className={cn(
               "block",
@@ -1078,7 +1080,7 @@ function MissingFieldInlineForm({ fields, plan }) {
             value={formState.title}
           />
         </div>
-        <div className="space-y-1">
+        <div className="space-y-1 flex-shrink-0">
           <label
             className={cn(
               "block",
@@ -1158,7 +1160,7 @@ function MissingFieldInlineForm({ fields, plan }) {
             })}
           </div>
         </div>
-        <div className="space-y-1">
+        <div className="space-y-1 flex-shrink-0">
           <label
             className={cn(
               "block",
@@ -1181,7 +1183,7 @@ function MissingFieldInlineForm({ fields, plan }) {
             value={formState.audioUrl}
           />
         </div>
-        <div className="space-y-1">
+        <div className="space-y-1 flex-shrink-0">
           <label
             className={cn(
               "block",
