@@ -1,6 +1,7 @@
 "use client";
 
-import { useId, useState } from "react";
+import { Pause, Play } from "lucide-react";
+import { useId, useRef, useState } from "react";
 import { Response } from "@/components/ai-elements/response";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -29,7 +30,28 @@ const IMAGE_ASPECT_RATIO_OPTIONS = [
   "21:9",
 ];
 const IMAGE_OUTPUT_FORMAT_OPTIONS = ["png", "jpeg"];
-const AUDIO_VOICE_OPTIONS = ["Alloy", "Verse", "Calm", "Vibrant"];
+const AUDIO_VOICE_OPTIONS = [
+  {
+    value: "Alloy",
+    label: "Alloy",
+    previewUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
+  },
+  {
+    value: "Verse",
+    label: "Verse",
+    previewUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
+  },
+  {
+    value: "Calm",
+    label: "Calm",
+    previewUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
+  },
+  {
+    value: "Vibrant",
+    label: "Vibrant",
+    previewUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3",
+  },
+];
 const FORM_SUBMISSION_IMAGE_PROMPT = "FORM_SUBMISSION::image-prompt";
 const FORM_SUBMISSION_AUDIO_PROMPT = "FORM_SUBMISSION::audio-prompt";
 
@@ -54,6 +76,8 @@ function AudioPromptInlineForm() {
     voice: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const audioRef = useRef(null);
+  const [previewingVoice, setPreviewingVoice] = useState(null);
 
   const isStreaming = status === "streaming";
   const scriptMissing = typeof formState.script !== "string" || formState.script.trim() === "";
@@ -63,6 +87,51 @@ function AudioPromptInlineForm() {
   const handleChange = (field) => (event) => {
     const { value } = event.target;
     setFormState((previous) => ({ ...previous, [field]: value }));
+  };
+
+  const stopPreview = () => {
+    const audio = audioRef.current;
+    if (!audio) {
+      return;
+    }
+
+    audio.pause();
+    audio.currentTime = 0;
+    setPreviewingVoice(null);
+  };
+
+  const handleVoiceSelect = (value) => {
+    stopPreview();
+    setFormState((previous) => ({ ...previous, voice: value }));
+  };
+
+  const togglePreview = (option) => {
+    const audio = audioRef.current;
+    if (!audio || !option?.previewUrl) {
+      return;
+    }
+
+    if (previewingVoice === option.value && !audio.paused) {
+      stopPreview();
+      return;
+    }
+
+    stopPreview();
+    audio.src = option.previewUrl;
+    audio
+      .play()
+      .then(() => {
+        setPreviewingVoice(option.value);
+      })
+      .catch(() => {
+        setPreviewingVoice(null);
+      });
+  };
+
+  const handlePreviewClick = (event, option) => {
+    event.preventDefault();
+    event.stopPropagation();
+    togglePreview(option);
   };
 
   const handleSubmit = async (event) => {
@@ -87,6 +156,7 @@ function AudioPromptInlineForm() {
       await sendMessage({
         parts: [{ type: "text", text: message }],
       });
+      stopPreview();
       setFormState({ script: "", voice: trimmedVoice });
     } catch (error) {
       requestAnimationFrame(() => {
@@ -150,19 +220,61 @@ function AudioPromptInlineForm() {
           >
             Voice<span className="text-destructive">*</span>
           </label>
-          <select
-            className={cn(...TEXT_INPUT_CLASSES)}
-            id={`${baseId}-voice`}
-            onChange={handleChange("voice")}
-            value={formState.voice}
-          >
-            <option value="">Select voice</option>
-            {AUDIO_VOICE_OPTIONS.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
+          <div aria-labelledby={`${baseId}-voice`} className="space-y-2" role="radiogroup">
+            {AUDIO_VOICE_OPTIONS.map((option) => {
+              const isSelected = formState.voice === option.value;
+              const isPlaying = previewingVoice === option.value;
+
+              return (
+                <label
+                  className={cn(
+                    "flex items-center justify-between gap-3 rounded-md border px-3 py-2 transition focus-within:ring-2 focus-within:ring-primary",
+                    isSelected
+                      ? "border-primary bg-primary/10"
+                      : "border-muted-foreground/40 hover:border-primary/60",
+                  )}
+                  htmlFor={`${baseId}-voice-${option.value}`}
+                  key={option.value}
+                >
+                  <div className="flex items-center gap-3">
+                    <input
+                      checked={isSelected}
+                      className="sr-only"
+                      id={`${baseId}-voice-${option.value}`}
+                      name={`${baseId}-voice`}
+                      onChange={() => handleVoiceSelect(option.value)}
+                      type="radio"
+                      value={option.value}
+                    />
+                    <span className="inline-flex size-8 items-center justify-center rounded-full border border-primary/40 bg-background text-primary">
+                      {option.label.charAt(0)}
+                    </span>
+                    <span className="font-medium text-foreground">{option.label}</span>
+                  </div>
+                  <button
+                    aria-label={`${isPlaying ? "Pause" : "Play"} ${option.label} preview`}
+                    className={cn(
+                      "flex size-9 items-center justify-center rounded-full border transition",
+                      isPlaying
+                        ? "border-primary bg-primary text-background"
+                        : "border-primary/40 text-primary hover:border-primary hover:bg-primary/10",
+                    )}
+                    onClick={(event) => handlePreviewClick(event, option)}
+                    type="button"
+                  >
+                    {isPlaying ? <Pause className="size-4" /> : <Play className="size-4" />}
+                  </button>
+                </label>
+              );
+            })}
+          </div>
+          <audio
+            aria-hidden
+            onEnded={stopPreview}
+            onPause={() => setPreviewingVoice(null)}
+            preload="none"
+            ref={audioRef}
+          />
         </div>
       </div>
       <Button className="w-full" disabled={!canSubmit} size="sm" type="submit" variant="default">
