@@ -40,10 +40,38 @@ export function GenerationSidebar({ className }) {
           >
             <StickToBottom.Content className="space-y-3 p-3 text-sm">
               {messages.length === 0 ? (
-                <div className="flex justify-start">
-                  <div className="max-w-[85%] rounded-lg bg-muted px-3 py-2 text-muted-foreground">
-                    Start ideating scenes here. This area will display the
-                    latest chat updates.
+                <div className="space-y-3">
+                  <div className="flex justify-start">
+                    <div className="max-w-[85%] rounded-lg bg-primary/10 px-3 py-2 text-primary">
+                      <p className="font-medium">👋 Hi, I'm Jaznan</p>
+                      <p>Your avatar video generator agent. What would you like to create today?</p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2 px-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs"
+                      onClick={() => setInput('Generate a video about')}
+                    >
+                      🎥 Generate Video
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs"
+                      onClick={() => setInput('Create an audio clip of')}
+                    >
+                      🔊 Generate Audio
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs"
+                      onClick={() => setInput('Generate an image of')}
+                    >
+                      🖼️ Generate Image
+                    </Button>
                   </div>
                 </div>
               ) : (
