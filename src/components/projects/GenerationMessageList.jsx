@@ -80,7 +80,8 @@ function AudioPromptInlineForm() {
     setPreviewingVoice(null);
   };
 
-  const handleVoiceSelect = (value) => {
+  const handleVoiceChange = (event) => {
+    const { value } = event.target;
     stopPreview();
     setFormState((previous) => ({ ...previous, voice: value }));
   };
@@ -108,10 +109,18 @@ function AudioPromptInlineForm() {
       });
   };
 
-  const handlePreviewClick = (event, option) => {
+  const selectedVoiceOption = formState.voice
+    ? AUDIO_VOICE_OPTIONS.find((option) => option.value === formState.voice)
+    : null;
+  const isPreviewing = selectedVoiceOption && previewingVoice === selectedVoiceOption.value;
+
+  const handlePreviewButtonClick = (event) => {
     event.preventDefault();
-    event.stopPropagation();
-    togglePreview(option);
+    if (!selectedVoiceOption) {
+      return;
+    }
+
+    togglePreview(selectedVoiceOption);
   };
 
   const handleSubmit = async (event) => {
@@ -150,6 +159,7 @@ function AudioPromptInlineForm() {
   return (
     <form
       className={cn(
+        "flex flex-col h-full",
         "bg-primary/5",
         "border",
         "border-dashed",
@@ -159,11 +169,13 @@ function AudioPromptInlineForm() {
         "rounded-lg",
         "space-y-3",
         "text-sm",
+        "max-h-[600px]",
+        "overflow-hidden"
       )}
       onSubmit={handleSubmit}
     >
       <p className="font-medium text-primary text-xs">Share the audio details and I’ll handle the rest.</p>
-      <div className="space-y-2">
+      <div className="flex-1 min-h-0 flex flex-col">
         <div className="space-y-1">
           <label
             className={cn(
@@ -200,80 +212,82 @@ function AudioPromptInlineForm() {
           >
             Voice<span className="text-destructive">*</span>
           </label>
-          <div aria-labelledby={`${baseId}-voice`} className="space-y-2" role="radiogroup">
-            {AUDIO_VOICE_OPTIONS.map((option) => {
-              const isSelected = formState.voice === option.value;
-              const isPlaying = previewingVoice === option.value;
+          <div className="flex-1 min-h-0 flex flex-col">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-full border border-primary/40 bg-background text-primary">
+                <Volume2 className="size-4" />
+              </span>
+              <h3 className="text-sm font-medium">Select a voice</h3>
+            </div>
+            <div className="flex-1 min-h-0 overflow-y-auto space-y-2 pr-2">
+              {AUDIO_VOICE_OPTIONS.map((option) => {
+                const isSelected = formState.voice === option.value;
+                const isPlaying = previewingVoice === option.value;
 
-              return (
-                <label
-                  className={cn(
-                    "flex items-center justify-between gap-3 rounded-md border px-3 py-2 transition focus-within:ring-2 focus-within:ring-primary",
-                    isSelected
-                      ? "border-primary bg-primary/10"
-                      : "border-muted-foreground/40 hover:border-primary/60",
-                  )}
-                  htmlFor={`${baseId}-voice-${option.value}`}
-                  key={option.value}
-                >
-                  <div className="flex items-center gap-3">
-                    <input
-                      checked={isSelected}
-                      className="sr-only"
-                      id={`${baseId}-voice-${option.value}`}
-                      name={`${baseId}-voice`}
-                      onChange={() => handleVoiceSelect(option.value)}
-                      type="radio"
-                      value={option.value}
-                    />
-                    <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-primary/40 bg-background text-primary">
-                      <Volume2 className="size-4" />
-                    </span>
-                    <div className="min-w-0 flex-1 space-y-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="truncate font-medium text-foreground">{option.label}</p>
-                        {option.gender ? (
-                          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                return (
+                  <div
+                    key={option.value}
+                    className={cn(
+                      "flex items-center gap-3 rounded-md border p-2 transition-colors cursor-pointer",
+                      isSelected 
+                        ? "border-primary bg-primary/10"
+                        : "border-muted-foreground/40 hover:border-primary/60"
+                    )}
+                    onClick={() => {
+                      setFormState(prev => ({ ...prev, voice: option.value }));
+                      stopPreview();
+                    }}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="truncate font-medium">{option.label}</p>
+                        {option.gender && (
+                          <span className="text-xs text-muted-foreground">
                             {option.gender}
                           </span>
-                        ) : null}
+                        )}
                       </div>
-                      {option.description ? (
-                        <p className="text-xs leading-snug text-muted-foreground">{option.description}</p>
-                      ) : null}
+                      <p className="text-xs text-muted-foreground truncate">
+                        {option.description}
+                      </p>
                     </div>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 p-0"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        togglePreview(option);
+                      }}
+                    >
+                      {isPlaying ? (
+                        <Pause className="h-4 w-4" />
+                      ) : (
+                        <Play className="h-4 w-4" />
+                      )}
+                    </Button>
                   </div>
-                  <button
-                    aria-label={`${isPlaying ? "Pause" : "Play"} ${option.label} preview`}
-                    className={cn(
-                      "flex size-9 items-center justify-center rounded-full border transition",
-                      isPlaying
-                        ? "border-primary bg-primary text-background"
-                        : "border-primary/40 text-primary hover:border-primary hover:bg-primary/10",
-                    )}
-                    onClick={(event) => handlePreviewClick(event, option)}
-                    type="button"
-                  >
-                    {isPlaying ? <Pause className="size-4" /> : <Play className="size-4" />}
-                  </button>
-                </label>
-              );
-            })}
+                );
+              })}
+            </div>
+            
+            <audio
+              ref={audioRef}
+              onEnded={stopPreview}
+              onPause={() => setPreviewingVoice(null)}
+              preload="none"
+              aria-hidden
+            >
+              <track kind="captions" />
+            </audio>
           </div>
-          <audio
-            aria-hidden
-            onEnded={stopPreview}
-            onPause={() => setPreviewingVoice(null)}
-            preload="none"
-            ref={audioRef}
-          >
-            <track kind="captions" />
-          </audio>
         </div>
       </div>
-      <Button className="w-full" disabled={!canSubmit} size="sm" type="submit" variant="default">
-        {isSubmitting ? "Sent" : "Send"}
-      </Button>
+      <div className="pt-2">
+        <Button className="w-full" disabled={!canSubmit} size="sm" type="submit" variant="default">
+          {isSubmitting ? "Sent" : "Send"}
+        </Button>
+      </div>
     </form>
   );
 }

@@ -54,9 +54,9 @@ export function GenerationView({ projectId }) {
   ), [projectId]);
 
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col gap-4 lg:grid lg:grid-cols-[420px_1fr]">
-      <GenerationSidebar className="hidden lg:block" />
-      <div className="flex h-full min-h-0 flex-col">
+    <div className="flex h-full min-h-0 flex-1 flex-col gap-4 lg:flex-row">
+      <GenerationSidebar className="hidden w-full lg:flex lg:w-[420px] lg:flex-col" />
+      <div className="flex h-full min-h-0 flex-1 flex-col">
         <div className="mb-4 lg:hidden">
           <Sheet>
             <SheetTrigger asChild>
