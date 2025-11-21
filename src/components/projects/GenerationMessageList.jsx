@@ -2,7 +2,7 @@
 
 import { Pause, Play, Volume2 } from "lucide-react";
 import { useId, useRef, useState } from "react";
-import { AUDIO_VOICE_OPTIONS, VOICES } from "@/data/voices";
+import { AUDIO_VOICE_OPTIONS } from "@/data/voices";
 import { Response } from "@/components/ai-elements/response";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -226,14 +226,21 @@ function AudioPromptInlineForm() {
                       type="radio"
                       value={option.value}
                     />
-                    <span className="inline-flex size-8 flex-shrink-0 items-center justify-center rounded-full border border-primary/40 bg-background text-primary">
+                    <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-primary/40 bg-background text-primary">
                       <Volume2 className="size-4" />
                     </span>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-foreground truncate">{option.label}</p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {VOICES.find(v => v.name === option.value)?.gender || 'Voice'}
-                      </p>
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="truncate font-medium text-foreground">{option.label}</p>
+                        {option.gender ? (
+                          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                            {option.gender}
+                          </span>
+                        ) : null}
+                      </div>
+                      {option.description ? (
+                        <p className="text-xs leading-snug text-muted-foreground">{option.description}</p>
+                      ) : null}
                     </div>
                   </div>
                   <button

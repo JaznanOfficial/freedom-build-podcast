@@ -123,9 +123,13 @@ export const VOICES = [
 ];
 
 // Default voice options for the select dropdown
-export const AUDIO_VOICE_OPTIONS = VOICES.map(({ id, name, previewUrl }) => ({
-  id,
-  value: name,
-  label: name,
-  previewUrl,
-}));
+export const AUDIO_VOICE_OPTIONS = VOICES.map(
+  ({ description, gender, id, name, previewUrl }) => ({
+    description,
+    gender,
+    id,
+    label: name,
+    previewUrl,
+    value: name,
+  }),
+);
