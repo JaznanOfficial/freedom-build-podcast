@@ -751,30 +751,41 @@ function shouldShowAudioPromptForm(content) {
     return false;
   }
 
-  const normalized = content.toLowerCase();
-  if (normalized.includes("share the script")) {
-    return true;
-  }
-  if (normalized.includes("provide the script")) {
-    return true;
-  }
-  if (normalized.includes("audio script")) {
-    return true;
-  }
-  if (normalized.includes("audio prompt") && normalized.includes("voice")) {
-    return true;
-  }
-  if (normalized.includes("please provide") && normalized.includes("script") && normalized.includes("voice")) {
-    return true;
-  }
-  if (normalized.includes("narration script") && normalized.includes("desired voice")) {
-    return true;
-  }
-  if (normalized.includes("once i have both") && normalized.includes("voice")) {
+  const normalized = content.toLowerCase().trim();
+  
+  // Common phrases that should trigger the audio form
+  const triggerPhrases = [
+    'share the script',
+    'provide the script',
+    'audio script',
+    'narration script',
+    'voiceover script',
+    'please provide the script',
+    'please share the script',
+    'enter the script',
+    'input the script',
+    'fill in the script',
+    'please enter the script',
+    'please input the script',
+    'please fill in the script'
+  ];
+
+  // Check if any trigger phrase is in the content
+  if (triggerPhrases.some(phrase => normalized.includes(phrase))) {
     return true;
   }
 
-  return false;
+  // Check for combination of keywords that specifically ask for user input
+  const hasAudioRelated = normalized.includes('audio') || 
+                         normalized.includes('voice') || 
+                         normalized.includes('narration') ||
+                         normalized.includes('voiceover');
+                         
+  const isRequestingInput = /(?:please|could you|would you|can you|kindly)/i.test(normalized) && 
+                          /(?:provide|share|enter|input|fill|give|submit)/i.test(normalized) &&
+                          /(?:script|audio|voice|narration)/i.test(normalized);
+
+  return hasAudioRelated || isRequestingInput;
 }
 
 export function GenerationMessageList({ messages }) {
@@ -867,6 +878,7 @@ export function GenerationMessageList({ messages }) {
       bubbles.push(buildTextBubble(message.id, content, isUser));
     }
 
+    // Show audio form if this is an assistant message and the content indicates we need audio input
     if (!isUser && shouldShowAudioPromptForm(originalContent) && !audioRequest) {
       bubbles.push(buildAudioPromptFormBubble({ messageId: message.id }));
     }
