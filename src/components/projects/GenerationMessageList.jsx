@@ -159,67 +159,51 @@ function AudioPromptInlineForm() {
   return (
     <form
       className={cn(
-        "flex flex-col h-full",
-        "bg-primary/5",
-        "border",
-        "border-dashed",
-        "border-primary/40",
-        "px-3",
-        "py-3",
-        "rounded-lg",
-        "space-y-3",
-        "text-sm",
-        "max-h-[600px]",
-        "overflow-hidden"
+        "flex flex-col bg-primary/5",
+        "border border-dashed border-primary/40",
+        "px-3 py-3 rounded-lg text-sm",
+        "max-h-[500px] min-h-[300px] flex flex-col"
       )}
       onSubmit={handleSubmit}
     >
-      <p className="font-medium text-primary text-xs">Share the audio details and I’ll handle the rest.</p>
-      <div className="flex-1 min-h-0 flex flex-col">
-        <div className="space-y-1">
+      <p className="font-medium text-primary text-xs">Share the audio details and I'll handle the rest.</p>
+      <div className="space-y-3 flex-1 flex flex-col">
+        <div className="space-y-1.5">
           <label
             className={cn(
-              "block",
-              "font-semibold",
-              "text-muted-foreground",
-              "text-xs",
-              "tracking-wide",
-              "uppercase",
+              "block text-xs font-medium text-muted-foreground uppercase tracking-wide"
             )}
             htmlFor={`${baseId}-script`}
           >
             Script<span className="text-destructive">*</span>
           </label>
           <textarea
-            className={cn(...TEXT_INPUT_CLASSES, "min-h-[96px]")}
+            className={cn(
+              "flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background",
+              "placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:ring-2",
+              "focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+              "min-h-[100px] resize-none"
+            )}
             id={`${baseId}-script`}
             onChange={handleChange("script")}
             placeholder="Provide the narration or lines for the audio"
             value={formState.script}
           />
         </div>
-        <div className="space-y-1">
-          <label
-            className={cn(
-              "block",
-              "font-semibold",
-              "text-muted-foreground",
-              "text-xs",
-              "tracking-wide",
-              "uppercase",
-            )}
-            htmlFor={`${baseId}-voice`}
-          >
-            Voice<span className="text-destructive">*</span>
-          </label>
+        <div className="space-y-2 flex-1 flex flex-col">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-primary/40 bg-background text-primary">
+              <Volume2 className="size-4" />
+            </span>
+            <label
+              className="text-sm font-medium text-foreground"
+              htmlFor={`${baseId}-voice`}
+            >
+              Voice<span className="text-destructive">*</span>
+            </label>
+          </div>
           <div className="flex-1 min-h-0 flex flex-col">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-full border border-primary/40 bg-background text-primary">
-                <Volume2 className="size-4" />
-              </span>
-              <h3 className="text-sm font-medium">Select a voice</h3>
-            </div>
-            <div className="flex-1 min-h-0 overflow-y-auto space-y-2 pr-2">
+            <div className="flex-1 min-h-0 overflow-y-auto space-y-2 pr-1">
               {AUDIO_VOICE_OPTIONS.map((option) => {
                 const isSelected = formState.voice === option.value;
                 const isPlaying = previewingVoice === option.value;
@@ -228,10 +212,11 @@ function AudioPromptInlineForm() {
                   <div
                     key={option.value}
                     className={cn(
-                      "flex items-center gap-3 rounded-md border p-2 transition-colors cursor-pointer",
+                      "flex items-center gap-3 rounded-lg border p-2.5 transition-colors cursor-pointer",
+                      "hover:bg-accent/50",
                       isSelected 
                         ? "border-primary bg-primary/10"
-                        : "border-muted-foreground/40 hover:border-primary/60"
+                        : "border-border"
                     )}
                     onClick={() => {
                       setFormState(prev => ({ ...prev, voice: option.value }));
@@ -240,21 +225,24 @@ function AudioPromptInlineForm() {
                   >
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className="truncate font-medium">{option.label}</p>
+                        <p className="text-sm font-medium text-foreground">{option.label}</p>
                         {option.gender && (
                           <span className="text-xs text-muted-foreground">
                             {option.gender}
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-muted-foreground truncate">
+                      <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
                         {option.description}
                       </p>
                     </div>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-8 w-8 p-0"
+                    <button
+                      type="button"
+                      className={cn(
+                        "inline-flex items-center justify-center rounded-full p-1.5",
+                        "text-muted-foreground hover:bg-accent hover:text-foreground",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      )}
                       onClick={(e) => {
                         e.stopPropagation();
                         togglePreview(option);
@@ -265,7 +253,7 @@ function AudioPromptInlineForm() {
                       ) : (
                         <Play className="h-4 w-4" />
                       )}
-                    </Button>
+                    </button>
                   </div>
                 );
               })}
@@ -284,8 +272,13 @@ function AudioPromptInlineForm() {
         </div>
       </div>
       <div className="pt-2">
-        <Button className="w-full" disabled={!canSubmit} size="sm" type="submit" variant="default">
-          {isSubmitting ? "Sent" : "Send"}
+        <Button 
+          className="w-full h-9 text-sm font-medium" 
+          disabled={!canSubmit} 
+          type="submit"
+          variant="default"
+        >
+          {isSubmitting ? "Generating..." : "Generate Audio"}
         </Button>
       </div>
     </form>
