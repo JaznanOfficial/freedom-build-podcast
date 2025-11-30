@@ -229,6 +229,18 @@ components/
 }
 ```
 
+### 9. Password Reset Collection
+```typescript
+{
+  _id: ObjectId,
+  userId: ObjectId (ref: User),
+  token: string (hashed),
+  expiresAt: Date,
+  isUsed: boolean,
+  createdAt: Date
+}
+```
+
 ---
 
 ## 🏗️ Project Structure
@@ -291,7 +303,28 @@ src/
 - Better-Auth integration with MongoDB adapter
 - Session management
 
-### 2. Dashboard
+### 2. Password Recovery
+- **Forgot Password Flow**:
+  1. User enters email on forgot password page
+  2. System generates secure reset token (valid for 1 hour)
+  3. Sends password reset email via Resend
+  4. Email contains magic link with token
+  
+- **Reset Password Flow**:
+  1. User clicks link in email
+  2. Redirected to reset password page with token
+  3. Validates token (check expiry)
+  4. User enters new password
+  5. Password updated, token invalidated
+  6. User redirected to login
+
+- **Security Measures**:
+  - Token expires after 1 hour
+  - One-time use tokens
+  - Rate limiting (max 3 requests per 15 minutes)
+  - Secure password hashing (bcrypt)
+
+### 3. Dashboard
 - Overview statistics (total notices, students, etc.)
 - Recent notices
 - Quick actions (Create Notice, Add Student)
