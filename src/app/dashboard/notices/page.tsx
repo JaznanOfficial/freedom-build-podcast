@@ -22,7 +22,8 @@ import Link from 'next/link';
 
 export default function NoticeHistoryPage() {
   return (
-    <div className="space-y-6">
+    <div className="py-4 md:py-6 px-4 lg:px-6">
+      <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Notice History</h1>
@@ -111,8 +112,43 @@ export default function NoticeHistoryPage() {
               ))}
             </TableBody>
           </Table>
+
+          {/* Pagination */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-4">
+            <p className="text-sm text-gray-600 dark:text-gray-400 text-center sm:text-left">
+              Showing 1 to 8 of 142 notices
+            </p>
+            <div className="flex items-center gap-1 sm:gap-2 flex-wrap justify-center">
+              <Button variant="outline" size="sm" disabled className="hidden sm:inline-flex">
+                Previous
+              </Button>
+              <Button variant="outline" size="sm" disabled className="sm:hidden">
+                Prev
+              </Button>
+              <Button variant="outline" size="sm" className="bg-indigo-600 text-white hover:bg-indigo-700">
+                1
+              </Button>
+              <Button variant="outline" size="sm">
+                2
+              </Button>
+              <Button variant="outline" size="sm" className="hidden sm:inline-flex">
+                3
+              </Button>
+              <span className="px-1 sm:px-2 hidden sm:inline">...</span>
+              <Button variant="outline" size="sm" className="hidden sm:inline-flex">
+                18
+              </Button>
+              <Button variant="outline" size="sm" className="hidden sm:inline-flex">
+                Next
+              </Button>
+              <Button variant="outline" size="sm" className="sm:hidden">
+                Next
+              </Button>
+            </div>
+          </div>
         </CardContent>
       </Card>
+    </div>
     </div>
   );
 }
