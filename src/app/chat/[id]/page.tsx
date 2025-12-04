@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
 import { useParams } from "next/navigation"
+import { useChat } from "@ai-sdk/react"
 import { AppSidebar } from "@/components/app-sidebar"
 import { SiteHeader } from "@/components/site-header"
 import {
@@ -14,52 +14,22 @@ import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Sparkles } from "lucide-react"
 
-// Mock data for UI demonstration
-type Message = {
-  id: string
-  role: "assistant" | "user"
-  content: string
-  timestamp: Date
-}
-
-const initialMessages: Message[] = [
-  {
-    id: "1",
-    role: "assistant",
-    content: "Hello! I'm your AI veterinary assistant. How can I help you today? You can describe your pet's symptoms or ask me about past assessments.",
-    timestamp: new Date(Date.now() - 60000),
-  },
-]
-
 export default function ChatPage() {
   const params = useParams()
   const chatId = params.id as string
-  const [messages, setMessages] = useState<Message[]>(initialMessages)
-  const [isLoading, setIsLoading] = useState(false)
-
-  const handleSendMessage = (content: string) => {
-    // Add user message
-    const userMessage = {
-      id: Date.now().toString(),
-      role: "user" as const,
-      content,
-      timestamp: new Date(),
-    }
-    setMessages((prev) => [...prev, userMessage])
-
-    // Simulate AI response (for UI demo only)
-    setIsLoading(true)
-    setTimeout(() => {
-      const aiMessage = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant" as const,
-        content: "I understand you're concerned about your pet. Could you provide more details about the symptoms you're observing? For example:\n\n• When did the symptoms start?\n• How severe are they?\n• Any changes in behavior or appetite?\n\nYou can also upload images if there are visible symptoms.",
-        timestamp: new Date(),
+  
+  const { messages, append, isLoading } = useChat({
+    id: chatId,
+    initialMessages: [
+      {
+        id: "welcome",
+        role: "assistant",
+        content: "Hello! I'm your AI veterinary assistant. How can I help you today? You can describe your pet's symptoms or ask me about past assessments.",
+        createdAt: new Date(),
       }
-      setMessages((prev) => [...prev, aiMessage])
-      setIsLoading(false)
-    }, 1000)
-  }
+    ],
+    body: { chatId },
+  })
 
   return (
     <SidebarProvider
@@ -98,9 +68,9 @@ export default function ChatPage() {
                   {messages.map((message) => (
                     <ChatMessage
                       key={message.id}
-                      role={message.role}
+                      role={message.role === 'data' ? 'assistant' : message.role}
                       content={message.content}
-                      timestamp={message.timestamp}
+                      timestamp={message.createdAt || new Date()}
                     />
                   ))}
                   
@@ -119,7 +89,10 @@ export default function ChatPage() {
                 </div>
 
                 {/* Input Area */}
-                <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
+                <ChatInput 
+                  onSendMessage={(content) => append({ role: 'user', content })} 
+                  isLoading={isLoading} 
+                />
               </Card>
 
               {/* Disclaimer */}
