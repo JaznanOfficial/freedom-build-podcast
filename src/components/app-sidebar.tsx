@@ -32,6 +32,7 @@ const data = {
       title: "AI Agent",
       url: "/chat",
       icon: IconMessageCircle,
+      special: true,
     },
     {
       title: "Dashboard",
